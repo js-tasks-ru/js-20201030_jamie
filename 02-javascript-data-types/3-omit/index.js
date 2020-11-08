@@ -5,8 +5,8 @@
  * @returns {object} - returns the new object
  */
 export const omit = (obj, ...fields) => {
-    const arrFromObj = Object.entries(obj),
-        newObj = [];
+    const arrFromObj = Object.entries(obj);
+    const newObj = [];
 
     arrFromObj.forEach( (item, index) => {
         if ( fields.includes(item[0]) ) return;
