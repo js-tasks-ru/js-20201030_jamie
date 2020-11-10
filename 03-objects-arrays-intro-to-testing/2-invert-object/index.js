@@ -5,4 +5,13 @@
  */
 export function invertObj(obj) {
 
+    if (typeof obj === "object") {    
+        const newObj = {};
+
+        for(let prop in obj) {
+            newObj[obj[prop]] = prop;
+        }
+        return newObj;
+    } 
+    else return obj;
 }
