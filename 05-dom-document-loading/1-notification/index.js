@@ -1,5 +1,5 @@
 export default class NotificationMessage {
-    static objNotification = null;
+    static elNotification = null;
 
     constructor(string = '', {duration = 1000, type = 'success'} = {}) {
         this.string = string;
@@ -12,22 +12,21 @@ export default class NotificationMessage {
         this.element = this.template.firstChild;
     }
 
-    show(targetElement) {
-        if (targetElement) this.element = targetElement;
-
-        if (!NotificationMessage.objNotification) {
-            this.addElement();
+    show(targetElement = document.body) {
+        if (!NotificationMessage.elNotification) {
+            this.addElement(targetElement);
         } else {
-            NotificationMessage.objNotification.destroy();
-            this.addElement();
+            NotificationMessage.elNotification.remove();
+            
+            this.addElement(targetElement);
         }             
     }
 
-    addElement() {
-        document.body.append(this.element);
-        NotificationMessage.objNotification = this;
+    addElement(targetElement) {
+        targetElement.append(this.element);
+        NotificationMessage.elNotification = this.element;
 
-        setTimeout( () => this.destroy(), this.duration );
+        setTimeout( () => this.remove(), this.duration );
     }
 
     get template() {
@@ -49,9 +48,7 @@ export default class NotificationMessage {
     }
 
     destroy() {
-        if (!this.element) return;
         this.remove();
-        this.element = null;
-        NotificationMessage.objNotification = null;
+        NotificationMessage.elNotification = null;
     }
 }
