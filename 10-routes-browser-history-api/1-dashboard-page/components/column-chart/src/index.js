@@ -3,120 +3,106 @@ import fetchJson from '../../../utils/fetch-json.js';
 const BACKEND_URL = 'https://course-js.javascript.ru';
 
 export default class ColumnChart {
-  element;
-  subElements = {};
   chartHeight = 50;
+    data = [];
 
-  constructor({
-    label = '',
-    link = '',
-    formatHeading = data => data,
-    url = '',
-    range = {
-      from: new Date(),
-      to: new Date(),
+    constructor( {  url = 'api/dashboard/orders', range = { from: new Date('2020-04-06'),
+                                                            to: new Date('2020-05-06') },
+                    label='', link = '', value = 0} = {} ) {  
+        this.path = url;
+        this.label = label;
+        this.link = link;
+        this.value = value;
+        this.from = range.from;        
+        this.to = range.to;        
+        this.element = this.template;
+        this.render();
     }
-  } = {}) {
-    this.url = new URL(url, BACKEND_URL);
-    this.range = range;
-    this.label = label;
-    this.link = link;
-    this.formatHeading = formatHeading;
 
-    this.render();
-  }
+    async update(startDate, endDate) { 
+        this.from = startDate;
+        this.to = endDate;
 
-  render() {
-    const { from, to } = this.range;
-    const element = document.createElement('div');
+        await this.render();   
+         
+        this.toggleClass();    
+    }     
 
-    element.innerHTML = this.template;
+    async render() {  
+        this.subElements = this.getChartContainer();
 
-    this.element = element.firstElementChild;
-    this.subElements = this.getSubElements(this.element);
+        const url = new URL(`https://course-js.javascript.ru/${this.path}`);
+        url.searchParams.set('from', this.from.toISOString());
+        url.searchParams.set('to', this.to.toISOString());
+        
+        const obj1 = await fetchJson(new URL(url));         
+        this.data = Object.values(obj1);
 
-    this.loadData(from, to);
-  }
-
-  getHeaderValue(data) {
-    return this.formatHeading(Object.values(data).reduce((accum, item) => (accum + item), 0));
-  }
-
-  async loadData(from, to) {
-    this.element.classList.add('column-chart_loading');
-    this.subElements.header.textContent = '';
-    this.subElements.body.innerHTML = '';
-
-    this.url.searchParams.set('from', from.toISOString());
-    this.url.searchParams.set('to', to.toISOString());
-
-    const data = await fetchJson(this.url);
-
-    this.setNewRange(from, to);
-
-    if (data && Object.values(data).length) {
-      this.subElements.header.textContent = this.getHeaderValue(data);
-      this.subElements.body.innerHTML = this.getColumnBody(data);
-
-      this.element.classList.remove('column-chart_loading');
+        this.toggleClass();        
     }
-  }
 
-  setNewRange(from, to) {
-    this.range.from = from;
-    this.range.to = to;
-  }
+    toggleClass() {
+        if (this.data.length === 0) {
+            if ( !this.element.classList.contains('column-chart_loading') ) {
+                this.element.classList.add('column-chart_loading');
+            }
+        }
+        else {            
+            this.element.classList.remove('column-chart_loading');
+            this.getBody();
+        }
+    }
 
-  getColumnBody(data) {
-    const maxValue = Math.max(...Object.values(data));
+    get template() {
+        const colChart = document.createElement('div');
+        colChart.classList.add('column-chart', 'column-chart_loading');
+        colChart.setAttribute('style', `--chart-height: ${this.chartHeight}`) ;
+        colChart.innerHTML =   `<div class="column-chart__title">
+                                    ${this.label}
+                                    ${this.checkLink()}
+                                </div>
+                                <div class="column-chart__container">
+                                    <div data-element="header" class="column-chart__header"></div>
+                                    <div data-element="body" class="column-chart__chart"></div>
+                                </div>`;
+        return colChart;
+    }
 
-    return Object.entries(data).map(([key, value]) => {
-      const scale = this.chartHeight / maxValue;
-      const percent = (value / maxValue * 100).toFixed(0);
-      const tooltip = `<span>
-        <small>${key.toLocaleString('default', {dateStyle: 'medium'})}</small>
-        <br>
-        <strong>${percent}%</strong>
-      </span>`;
+    checkLink() {
+        if (this.link) return `<a href="${this.link}" class="column-chart__link">View all</a>`;
+        else return '';
+    }
 
-      return `<div style="--value: ${Math.floor(value * scale)}" data-tooltip="${tooltip}"></div>`;
-    }).join('');
-  }
+    getChartContainer() {
+        const chartContainer = {};
+        const dataElements = this.element.querySelectorAll('[data-element]');
 
-  getLink() {
-    return this.link ? `<a class="column-chart__link" href="${this.link}">View all</a>` : '';
-  }
+        for (let el of dataElements) {
+            chartContainer[el.dataset.element] = el;
+        }
+        return chartContainer;
+    }
 
-  get template() {
-    return `
-      <div class="column-chart column-chart_loading" style="--chart-height: ${this.chartHeight}">
-        <div class="column-chart__title">
-          Total ${this.label}
-          ${this.getLink()}
-        </div>
-        <div class="column-chart__container">
-          <div data-element="header" class="column-chart__header"></div>
-          <div data-element="body" class="column-chart__chart"></div>
-        </div>
-      </div>
-    `;
-  }
+    getBody() {
+        const maxValue = Math.max(...this.data);
+        const scale = 50 / maxValue;
 
-  getSubElements(element) {
-    const elements = element.querySelectorAll('[data-element]');
+        this.value = this.data.reduce( (accum, current) => accum += current, 0);
 
-    return [...elements].reduce((accum, subElement) => {
-      accum[subElement.dataset.element] = subElement;
+        const divString = this.data.map( item => {
+            return `<div style="--value: ${Math.floor(item * scale)}" data-tooltip=${(item / maxValue * 100).toFixed(0) + '%'}></div>`;
+        } ).join('');
+        
+        this.subElements.header.innerHTML = this.value;
+        this.subElements.body.innerHTML = divString;
+    }
 
-      return accum;
-    }, {});
-  }
+    remove() {
+        this.element.remove();
+    }
 
-  async update(from, to) {
-    return await this.loadData(from, to);
-  }
-
-  destroy() {
-    this.element.remove();
-  }
+    destroy() {
+        this.remove();
+        this.subElements = null;
+    } 
 }
